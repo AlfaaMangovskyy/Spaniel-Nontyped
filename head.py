@@ -1,3 +1,4 @@
+from random import randint
 import sys, os, time
 import datetime as dt
 import webbrowser as wb
@@ -6,6 +7,9 @@ from colorama import Fore
 from abc import ABC, abstractmethod
 
 args = sys.argv
+
+TRUE = "1b"
+FALSE = "0b"
 
 PFIX_FUNC = "-"
 PFIX_VAR = "$"
@@ -24,9 +28,15 @@ SFIX_FUNC_WB = "web"
 SFIX_FUNC_ERR = "err"
 SFIX_FUNC_SQUARE = "square"
 SFIX_FUNC_CUBE = "cube"
+SFIX_FUNC_RANDOM_INTEGER = "ri"
 
 SFIX_KWORD_INCLUDE = "include"
 SFIX_KWORD_FUNC = "func"
+SFIX_KWORD_IF = "if"
+SFIX_KWORD_LOOP = "loop"
+
+OP_KWORD_IF_EQUALS = "=="
+OP_KWORD_IF_EQUALS_NOT = "!="
 
 v_names = ["__debug__"]
 v_values = ["01234567899876543210"]
@@ -42,6 +52,9 @@ im = []
 suffix_head = ""
 suffix_tail = ""
 suffix_tail_sp = []
+
+read_lock = False
+is_end = False
 
 def glue(data : list):
     out = ""
@@ -128,7 +141,7 @@ class math_Calculator(DefaultClass):
 obj = {"__debugobject__":DebugClass()}
 # Doggos <3
 
-def format_string(string):
+def format_string(string : str):
     for i in range(len(v_names)):
         actual_v_id = i
         actual_v_name = v_names[actual_v_id]
@@ -140,6 +153,28 @@ def format_string(string):
         actual_c_name = c_names[actual_c_id]
         actual_c_value = c_values[actual_c_id]
         string = string.replace(PFIX_CONST + actual_c_name, actual_c_value)
+
+    return string
+
+def format_expressions(string : str):
+    # <<ask>>
+    if "<<ask>>" in string:
+        string = string.replace("<<ask>>", input(" "))
+    # [<<ri>>x2x3]
+    #     |   | |
+    #    ri  n1 n2
+    if "[<<ri>>" in string:
+        tempPOS1 = string.find("[<<ri>>")
+        tempPOS2 = string.find("]")
+        tempSTR = string[tempPOS1:tempPOS2+1]
+        tempSTR = tempSTR.replace("[", "").replace("]", "")
+        tempSTRSPLIT = tempSTR.split("x")
+        tempA = int(tempSTRSPLIT[1])
+        tempB = int(tempSTRSPLIT[2])
+        string = string.replace(tempSTR, str(randint(tempA, tempB)))
+        string = string.strip("[")
+        string = string.strip("]")
+        string = string.replace("[", "").replace("]", "")
 
     return string
 
@@ -168,6 +203,30 @@ def check_classes(id : str, name : str, args = []):
     else:
         return err("ClassError", f"Class \"{id}\" not found in the class registery.")
 
+def check_if(iss : str) -> bool:
+    isc = iss.split(" ")
+
+    if len(isc) == 3:
+        var1 = isc[0]
+        check = isc[1]
+        var2 = isc[2]
+
+        var1 = format_string(var1)
+        var2 = format_string(var2)
+
+        if check == OP_KWORD_IF_EQUALS:
+            if var1 == var2:
+                return True
+            else:
+                return False
+        elif check == OP_KWORD_IF_EQUALS_NOT:
+            if not var1 == var2:
+                return True
+            else:
+                return False
+        else:
+            return err("OperatorError", f"Invalid operator : {check}.")
+
 def im_math():
     im.append("math")
 
@@ -195,167 +254,209 @@ def im_studioLT3():
 
     obj["__defaultStudio__"] = studioLT3_Studio()
 
+def im_random():
+    im.append("random")
+
 def classify(data : list) -> str:
-    if len(data) == 2:
-        prefix = data[0]
-        suffix = data[1]
+    global read_lock
 
-        suffix_sp = suffix.split(" ")
-        suffix_tail_sp = suffix_sp[1:]
+    prefix = data[0]
+    suffix = data[1]
 
-        suffix_head = suffix_sp[0]
-        if not len(suffix_sp) == 1:
-            temp = suffix.find(" ")+1
-            suffix_tail = suffix[temp:]
-        else:
-            suffix_tail = suffix_tail_sp
+    suffix_sp = suffix.split(" ")
+    suffix_tail_sp = suffix_sp[1:]
 
-        if prefix == PFIX_FUNC:
-            if suffix_head == SFIX_FUNC_FLUSH:
-                if not len(suffix_sp) == 1:
-                    temp2 = suffix_tail
-                    temp2 = format_string(temp2)
-                    return temp2
-                else:
-                    return err("ArgumentError", "Needed argument is missing.")
-            elif suffix_head == SFIX_FUNC_FLUSHYELLOW:
-                if not len(suffix_sp) == 1:
-                    temp2 = suffix_tail
-                    temp2 = format_string(temp2)
-                    return f"{Fore.YELLOW}{temp2}{Fore.RESET}"
-                else:
-                    return err("ArgumentError", "Needed argument is missing.")
-            elif suffix_head == SFIX_FUNC_FLUSHRED:
-                if not len(suffix_sp) == 1:
-                    temp2 = suffix_tail
-                    temp2 = format_string(temp2)
-                    return f"{Fore.RED}{temp2}{Fore.RESET}"
-                else:
-                    return err("ArgumentError", "Needed argument is missing.")
-            elif suffix_head == SFIX_FUNC_FLUSHDEBUG:
-                return f"{Fore.CYAN}This is a debug message. Have a great day!{Fore.RESET}"
-            elif suffix_head == SFIX_FUNC_SYS:
-                try:
-                    os.system(suffix_tail)
-                except:
-                    return err("SysError", "Unknown SYS cl error.")
-            elif suffix_head == SFIX_FUNC_ERR:
-                return err(suffix_tail_sp[0], suffix_tail.replace(suffix_tail_sp[0] + " ", ""))
-
-            # DEFINED FUNCTIONS
-
-            for i in range(len(f_names)):
-                actual_f_id = i
-                actual_f_name = f_names[actual_f_id]
-                actual_f_value = f_values[actual_f_id]
-
-                if suffix_head == actual_f_name:
-                    return classify(scissors(actual_f_value.replace(actual_f_name + " ", "")))
-
-            # ADDITIONAL FUNCTIONS (AVAILABLE ONLY THROUGH ?include INSTRUCTIONSD)
-
-            if "web" in im:
-                if suffix_head == SFIX_FUNC_WB:
-                    try:
-                        wb.open(suffix_tail)
-                    except:
-                        return err("WebOpeningError", "Unknown WEBOPENINGS error.")
-            if "math" in im:
-                if suffix_head == SFIX_FUNC_SQUARE:
-                    return str(int(suffix_tail_sp[0]) * int(suffix_tail_sp[0]))
-                if suffix_head == SFIX_FUNC_CUBE:
-                    return str(int(suffix_tail_sp[0]) * int(suffix_tail_sp[0]) * int(suffix_tail_sp[0]))
-        elif prefix == PFIX_VAR:
-            if not len(suffix_tail_sp) == 0:
-                if suffix_tail_sp[0] == "=":
-                    temp3 = suffix_tail.replace("= ", "")
-                    if not temp3.startswith(PFIX_OBJ):
-                        if not suffix_head in v_names:
-                            v_names.append(suffix_head)
-                            v_values.append(suffix_tail.replace("= ", ""))
-                        else:
-                            v_values[v_names.index(suffix_head)] = suffix_tail.replace("= ", "")
-                    # else:
-                    #     temp4 = temp3.split(" ")
-                    #     temp4_head = temp4[0].replace(PFIX_OBJ, "")
-                    #     temp4_body = temp4[1:]
-
-                    #     v_names.append(suffix_head)
-                    #     try:
-                    #         v_values.append(class_ids[temp4_head])
-                    #     except KeyError:
-                    #         return err("ClassError", f"Class \"{temp4_head}\" not found in the registery.")
-            else:
-                return err("ArgumentError", "Needed argument is missing.")
-        elif prefix == PFIX_CONST:
-            if not len(suffix_tail_sp) == 0:
-                if suffix_tail_sp[0] == "=":
-                    if not suffix_head in c_names:
-                        c_names.append(suffix_head)
-                        c_values.append(suffix_tail.replace("= ", ""))
-                    else:
-                        return err("ImmutableObjectModificationError", "Cannot modify <CONST> data type.")
-            else:
-                return err("ArgumentError", "Needed argument is missing.")
-        elif prefix == PFIX_KWORD:
-            if not len(suffix_tail_sp) == 0:
-                if suffix_head == SFIX_KWORD_INCLUDE:
-                    if suffix_tail_sp[0] == "math":
-                        im_math()
-                    elif suffix_tail_sp[0] == "web":
-                        im_web()
-                    elif suffix_tail_sp[0] == "studioLT3":
-                        im_studioLT3()
-                    else:
-                        if f"{suffix_tail_sp[0]}.sp" in os.listdir("packages\\external"):
-                            run_file(f"packages\\external\\{suffix_tail_sp[0]}.sp")
-                        else:
-                            return err("IncludeModuleError", f"Module \"{suffix_tail_sp[0]}\" not found.")
-                elif suffix_head == SFIX_KWORD_FUNC:
-                    if suffix_tail_sp[1] == "=":
-                        if not suffix_head in f_names:
-                            f_names.append(suffix_tail_sp[0])
-                            f_values.append(suffix_tail.replace("= ", ""))
-                        else:
-                            return err("ImmutableObjectModificationError", "Cannot modify <FUNC> data type.")
-                    else:
-                        return err("MarkError", "Expected \"=\" mark.")
-            else:
-                return err("ArgumentError", "Needed argument is missing.")
-        elif prefix == PFIX_OBJ:
-            if suffix_tail_sp[0] == ".":
-                if suffix_head in obj:
-                    obj[suffix_head].IDc(suffix_tail[0].replace(". ", ""), suffix_tail_sp[1:])
-            elif suffix_tail_sp[0] == "=":
-                check_classes(suffix_tail_sp[1], suffix_head, suffix_tail_sp[2:])
-        elif prefix == PFIX_COM:
-            pass
-        elif prefix == PFIX_DECOR:
-            if suffix_head == "silent":
-                return ["@silent", classify(scissors(suffix_tail))]
-        else:
-            return err("PrefixError", "Invalid prefix.")
+    suffix_head = suffix_sp[0]
+    if not len(suffix_sp) == 1:
+        temp = suffix.find(" ")+1
+        suffix_tail = suffix[temp:]
     else:
-        return err("BuiltinListError", "Error in built-in list.")
+        suffix_tail = suffix_tail_sp
+
+    if read_lock == False:
+            if len(data) == 2:
+
+                if prefix == PFIX_FUNC:
+                    if suffix_head == SFIX_FUNC_FLUSH:
+                        if not len(suffix_sp) == 1:
+                            temp2 = suffix_tail
+                            temp2 = format_string(temp2)
+                            return temp2
+                        else:
+                            return err("ArgumentError", "Needed argument is missing.")
+                    elif suffix_head == SFIX_FUNC_FLUSHYELLOW:
+                        if not len(suffix_sp) == 1:
+                            temp2 = suffix_tail
+                            temp2 = format_string(temp2)
+                            return f"{Fore.YELLOW}{temp2}{Fore.RESET}"
+                        else:
+                            return err("ArgumentError", "Needed argument is missing.")
+                    elif suffix_head == SFIX_FUNC_FLUSHRED:
+                        if not len(suffix_sp) == 1:
+                            temp2 = suffix_tail
+                            temp2 = format_string(temp2)
+                            return f"{Fore.RED}{temp2}{Fore.RESET}"
+                        else:
+                            return err("ArgumentError", "Needed argument is missing.")
+                    elif suffix_head == SFIX_FUNC_FLUSHDEBUG:
+                        return f"{Fore.CYAN}This is a debug message. Have a great day!{Fore.RESET}"
+                    elif suffix_head == SFIX_FUNC_SYS:
+                        try:
+                            os.system(suffix_tail)
+                        except:
+                            return err("SysError", "Unknown SYS cl error.")
+                    elif suffix_head == SFIX_FUNC_ERR:
+                        return err(suffix_tail_sp[0], suffix_tail.replace(suffix_tail_sp[0] + " ", ""))
+
+                    # DEFINED FUNCTIONS
+
+                    for i in range(len(f_names)):
+                        actual_f_id = i
+                        actual_f_name = f_names[actual_f_id]
+                        actual_f_value = f_values[actual_f_id]
+
+                        if suffix_head == actual_f_name:
+                            return classify(scissors(actual_f_value.replace(actual_f_name + " ", "")))
+
+                    # ADDITIONAL FUNCTIONS (AVAILABLE ONLY THROUGH ?include INSTRUCTIONSD)
+
+                    if "web" in im:
+                        if suffix_head == SFIX_FUNC_WB:
+                            try:
+                                wb.open(suffix_tail)
+                            except:
+                                return err("WebOpeningError", "Unknown WEBOPENINGS error.")
+                    if "math" in im:
+                        if suffix_head == SFIX_FUNC_SQUARE:
+                            return str(int(suffix_tail_sp[0]) * int(suffix_tail_sp[0]))
+                        if suffix_head == SFIX_FUNC_CUBE:
+                            return str(int(suffix_tail_sp[0]) * int(suffix_tail_sp[0]) * int(suffix_tail_sp[0]))
+                    if "random" in im:
+                        if suffix_head == SFIX_FUNC_RANDOM_INTEGER:
+                            return format_expressions(f"[<<ri>>x{suffix_tail_sp[0]}x{suffix_tail_sp[1]}]")
+                elif prefix == PFIX_VAR:
+                    if not len(suffix_tail_sp) == 0:
+                        if suffix_tail_sp[0] == "=":
+                            if not suffix_tail.replace("= ", "").startswith(PFIX_FUNC):
+                                if not suffix_head in v_names:
+                                    v_names.append(suffix_head)
+                                    v_values.append(suffix_tail.replace("= ", ""))
+                                else:
+                                    v_values[v_names.index(suffix_head)] = suffix_tail.replace("= ", "")
+                            else:
+                                if not suffix_head in v_names:
+                                    v_names.append(suffix_head)
+                                    v_values.append(classify(scissors(suffix_tail.replace("= ", ""))))
+                                else:
+                                    v_values[v_names.index(suffix_head)] = classify(scissors(suffix_tail.replace("= ", "")))
+                    else:
+                        return err("ArgumentError", "Needed argument is missing.")
+                elif prefix == PFIX_CONST:
+                    if not len(suffix_tail_sp) == 0:
+                        if suffix_tail_sp[0] == "=":
+                            if not suffix_tail.replace("= ", "").startswith(PFIX_FUNC):
+                                if not suffix_head in c_names:
+                                    c_names.append(suffix_head)
+                                    c_values.append(suffix_tail.replace("= ", ""))
+                                else:
+                                    return err("ImmutableObjectModificationError", "Cannot modify <CONST> data type.")
+                            else:
+                                if not suffix_head in v_names:
+                                    v_names.append(suffix_head)
+                                    v_values.append(classify(scissors(suffix_tail.replace("= ", ""))))
+                                else:
+                                    return err("ImmutableObjectModificationError", "Cannot modify <CONST> data type.")
+                    else:
+                        return err("ArgumentError", "Needed argument is missing.")
+                elif prefix == PFIX_KWORD:
+                    if not len(suffix_tail_sp) == 0:
+                        if suffix_head == SFIX_KWORD_INCLUDE:
+                            if suffix_tail_sp[0] == "math":
+                                im_math()
+                            elif suffix_tail_sp[0] == "web":
+                                im_web()
+                            elif suffix_tail_sp[0] == "studioLT3":
+                                im_studioLT3()
+                            elif suffix_tail_sp[0] == "random":
+                                im_random()
+                            else:
+                                if f"{suffix_tail_sp[0]}.sp" in os.listdir("packages\\external"):
+                                    run_file(f"packages\\external\\{suffix_tail_sp[0]}.sp")
+                                else:
+                                    return err("IncludeModuleError", f"Module \"{suffix_tail_sp[0]}\" not found.")
+                        elif suffix_head == SFIX_KWORD_FUNC:
+                            if suffix_tail_sp[1] == "=":
+                                if not suffix_head in f_names:
+                                    f_names.append(suffix_tail_sp[0])
+                                    f_values.append(suffix_tail.replace("= ", ""))
+                                else:
+                                    return err("ImmutableObjectModificationError", "Cannot modify <FUNC> data type.")
+                            else:
+                                return err("MarkError", "Expected \"=\" mark.")
+                        elif suffix_head == SFIX_KWORD_IF:
+                            if check_if(suffix_tail.replace(" {", "")):
+                                pass
+                            else:
+                                read_lock = True
+                        elif suffix_head == SFIX_KWORD_LOOP:
+                            pass
+                    else:
+                        return err("ArgumentError", "Needed argument is missing.")
+                elif prefix == PFIX_OBJ:
+                    if suffix_tail_sp[0] == ".":
+                        if suffix_head in obj:
+                            obj[suffix_head].IDc(suffix_tail_sp[1].replace(". ", ""), suffix_tail_sp[1:])
+                    elif suffix_tail_sp[0] == "=":
+                        check_classes(suffix_tail_sp[1], suffix_head, suffix_tail_sp[2:])
+                elif prefix == PFIX_COM:
+                    pass
+                elif prefix == PFIX_DECOR:
+                    if suffix_head == "silent":
+                        return ["@silent", classify(scissors(suffix_tail))]
+                elif prefix == "}":
+                    pass
+                else:
+                    return err("PrefixError", "Invalid prefix.")
+            else:
+                return err("BuiltinListError", "Error in built-in list.")
+    else:
+        if prefix == "}":
+            read_lock = False
+    
+    if prefix == "}":
+        cur_repeats = 1
 
 def run_file(pathin):
+    global is_end, end_stamp
     if os.path.exists(pathin):
         file = open(pathin, "r")
         data = file.readlines()
         for r in data:
+            r = format_expressions(r)
             temp420 = classify(scissors(r.strip("\n")))
             if not temp420 == None:
                 print(temp420)
+        is_end = True
+        end_stamp = time.time()
+        temp3110 = round(end_stamp - run_stamp, 2)
+        if temp3110 >= 0.3:
+            print(f"\n{Fore.LIGHTGREEN_EX}[RUN]{Fore.RESET} Runtime finished in {temp3110} seconds.\n")
+        else:
+            print(f"\n{Fore.LIGHTGREEN_EX}[RUN]{Fore.RESET} Runtime finished in ~ 0.2 seconds.\n")
 
 if len(args) == 1:
     while True:
         temp69 = input(f"{Fore.LIGHTYELLOW_EX}> {Fore.RESET}")
-        if not type(classify(scissors(temp69))) == list:
-            if not classify(scissors(temp69)) == None:
-                print(classify(scissors(temp69)))
+        temp69 = format_expressions(temp69)
+        temp2307 = classify(scissors(temp69))
+        if not type(temp2307) == list:
+            if not temp2307 == None:
+                print(temp2307)
         else:
-            if not classify(scissors(temp69))[0] == "@silent":
-                if not classify(scissors(temp69)) == None:
-                    print(classify(scissors(temp69)))
+            if not temp2307[0] == "@silent":
+                if not temp2307 == None:
+                    print(temp2307)
 else:
+    run_stamp = time.time()
+    is_end = False
     run_file(args[1])
